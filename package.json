@@ -1,0 +1,31 @@
+{
+  "name": "kygger",
+  "version": "0.1.0",
+  "description": "API types generator and client factory for OpenAPI",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "kygger": "./bin/kygger.js"
+  },
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts src/generator.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts src/generator.ts --format cjs,esm --watch --dts",
+    "generate": "tsx src/generator.ts"
+  },
+  "dependencies": {
+    "ky": "^2.0.2",
+    "prettier": "^3.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "tsup": "^8.0.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "type": "module"
+}
