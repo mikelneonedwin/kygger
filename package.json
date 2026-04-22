@@ -9,7 +9,8 @@
     "kygger": "./bin/kygger.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "scripts": {
     "build": "tsup src/index.ts src/generator.ts --format cjs,esm --dts --clean",
@@ -19,21 +20,8 @@
     "ky": "^1.14.3",
     "prettier": "^3.8.1"
   },
-  "files": [
-    "dist",
-    "bin"
-  ],
-  "scripts": {
-    "build": "tsup src/index.ts src/generator.ts --format cjs,esm --dts --clean",
-    "dev": "tsup src/index.ts src/generator.ts --format cjs,esm --watch --dts",
-    "generate": "tsx src/generator.ts"
-  },
-  "dependencies": {
-    "ky": "^2.0.2",
-    "prettier": "^3.8.1"
-  },
   "devDependencies": {
-    "@types/node": "^25.6.0",
+    "@types/node": "^20.19.30",
     "tsup": "^8.0.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
