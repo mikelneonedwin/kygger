@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
 import { createRequire } from "module";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -11,12 +11,12 @@ const require = createRequire(import.meta.url);
 const generatorPath = join(__dirname, "../dist/generator.js");
 
 // Use dynamic import to run the compiled ESM generator
-import(generatorPath).catch((err) => {
+import(generatorPath).catch((err1) => {
   // Fallback to require if ESM fails (though tsup generates both)
   try {
     require(generatorPath);
-  } catch (e) {
-    console.error("Failed to load generator:", err);
+  } catch (err2) {
+    console.error("Failed to load generator:", err1, err2);
     process.exit(1);
   }
 });
