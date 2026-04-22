@@ -373,7 +373,26 @@ export type K = {
 
 async function main() {
   const src = process.argv[2];
-  const out = process.argv[3] || "src/api.types.ts";
+  let out = process.argv[3];
+
+  if (!out) {
+    try {
+      const pkgPath = path.resolve(process.cwd(), "package.json");
+      if (fs.existsSync(pkgPath)) {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+        if (pkg.kygger && pkg.kygger.output) {
+          out = pkg.kygger.output;
+        }
+      }
+    } catch (e) {
+      // Ignore errors reading package.json
+    }
+  }
+
+  if (!out) {
+    out = "kygger.types.ts";
+  }
+
   if (!src) {
     console.error("Usage: kygger <source-url-or-file> [output-path]");
     process.exit(1);
