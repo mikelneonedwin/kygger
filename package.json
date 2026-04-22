@@ -6,7 +6,7 @@
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "bin": {
-    "kygger": "./bin/kygger.js"
+    "kygger": "bin/kygger.js"
   },
   "files": [
     "dist",
