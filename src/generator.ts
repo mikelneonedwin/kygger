@@ -1,8 +1,17 @@
 #!/usr/bin/env tsx
-import * as fs from "fs";
-import * as path from "path";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import * as prettier from "prettier";
-import { fileURLToPath } from "url";
+import { parseKyggerConfig, resolveOutputPaths } from "./config.js";
+
+export function ensureDirExists(filePath: string): void {
+  const dir = dirname(filePath);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+}
 
 function isUrl(input: string): boolean {
   try {
@@ -28,11 +37,9 @@ export async function getTextContent(input: string): Promise<string> {
     input = fileURLToPath(input);
   }
 
-  const absolutePath = path.resolve(input);
-  return fs.readFileSync(absolutePath, "utf-8");
+  const absolutePath = resolve(input);
+  return readFileSync(absolutePath, "utf-8");
 }
-
-// --- Types representing the OpenAPI 3.0 Structure (Simplified) ---
 
 interface OpenApiSpec {
   openapi: string;
@@ -91,11 +98,9 @@ interface SchemaObject {
   nullable?: boolean;
 }
 
-// --- Helper Functions ---
-
 function toPascalCase(str: string): string {
-  return str.replace(/(^\w|[_\-]\w)/g, (match) =>
-    match.replace(/[_\-]/, "").toUpperCase(),
+  return str.replace(/(^\w|[_-]\w)/g, (match) =>
+    match.replace(/[_-]/, "").toUpperCase(),
   );
 }
 
@@ -153,7 +158,7 @@ function parseSchema(schema: SchemaObject, rootSpec: OpenApiSpec): string {
     case "array":
       return withNullable(`(${parseSchema(schema.items || {}, rootSpec)})[]`);
 
-    case "object":
+    case "object": {
       if (!schema.properties) return withNullable("Record<string, unknown>");
 
       const props = Object.entries(schema.properties).map(([key, value]) => {
@@ -161,6 +166,7 @@ function parseSchema(schema: SchemaObject, rootSpec: OpenApiSpec): string {
         return `${key}${isRequired ? "" : "?"}: ${parseSchema(value, rootSpec)};`;
       });
       return withNullable(`{\n${props.join("\n")}\n}`);
+    }
 
     default:
       if (schema.properties) {
@@ -220,14 +226,53 @@ function generateQueryParamsType(
   return `{\n${props.join("\n")}\n}`;
 }
 
-// --- Main Generator Logic ---
+export async function generate(
+  src: string,
+  outputFolder?: string,
+): Promise<void> {
+  const cwd = process.cwd();
+  let typesPath: string | null = null;
+  let zodPath: string | null = null;
 
-export async function generate(src: string, outputFile: string) {
+  if (outputFolder) {
+    typesPath = join(outputFolder, "api.types.ts");
+    zodPath = join(outputFolder, "api.zod.ts");
+  } else {
+    try {
+      const pkgPath = resolve(cwd, "package.json");
+      if (existsSync(pkgPath)) {
+        const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+        if (pkg.kygger) {
+          const config = parseKyggerConfig(pkg.kygger);
+          const { typesPath: tp, zodPath: zp } = resolveOutputPaths(
+            config,
+            cwd,
+          );
+          typesPath = tp;
+          zodPath = zp;
+        }
+      }
+    } catch (e) {
+      const error = e as Error;
+      if (
+        e instanceof Error &&
+        error.message.startsWith("Invalid kygger configuration")
+      ) {
+        console.error(error.message);
+        process.exit(1);
+      }
+    }
+  }
+
+  if (!typesPath && !zodPath) {
+    typesPath = join(cwd, "api.types.ts");
+    zodPath = join(cwd, "api.zod.ts");
+  }
+
   const jsonText = await getTextContent(src);
   const spec: OpenApiSpec = JSON.parse(jsonText);
   const buffer: string[] = [];
 
-  // 1. Generate Schema Interfaces (Components)
   buffer.push(`/* eslint-disable */`);
   buffer.push(`// --- Generated Types from OpenAPI Spec --- \n`);
 
@@ -238,23 +283,19 @@ export async function generate(src: string, outputFile: string) {
     }
   }
 
-  // 2. Generate Paths Union
   const paths = Object.keys(spec.paths);
   const pathsString = paths.map((p) => `"${p}"`).join(" | \n  ");
   buffer.push(`export type Paths = \n  ${pathsString};\n`);
 
-  // 3. Generate The ApiTree (Restructured to ApiTree[Method][Path])
-  buffer.push(`export interface ApiTree {`);
+  buffer.push(`export interface KyggerTree {`);
 
   const methods = ["get", "post", "put", "delete", "patch"] as const;
 
   for (const method of methods) {
-    // Check if any path implements this method
     const pathsWithMethod = Object.entries(spec.paths).filter(
       ([, pathItem]) => !!pathItem[method],
     );
 
-    // Skip the method block entirely if no paths use it
     if (pathsWithMethod.length === 0) continue;
 
     buffer.push(`  "${method}": {`);
@@ -265,7 +306,6 @@ export async function generate(src: string, outputFile: string) {
       buffer.push(`    "${route}": {`);
       buffer.push(`      pathname: "${route}";`);
 
-      // Path Params
       const pathParamsType = generatePathParamsType(
         route,
         pathItem.parameters as ParameterObject[],
@@ -274,7 +314,6 @@ export async function generate(src: string, outputFile: string) {
         buffer.push(`      params: ${pathParamsType};`);
       }
 
-      // Query Params
       if (op.parameters) {
         const queryType = generateQueryParamsType(op.parameters, spec);
         if (queryType !== "undefined") {
@@ -282,7 +321,6 @@ export async function generate(src: string, outputFile: string) {
         }
       }
 
-      // Response Body
       const successKey = Object.keys(op.responses || {}).find((k) =>
         k.startsWith("2"),
       );
@@ -302,7 +340,6 @@ export async function generate(src: string, outputFile: string) {
         }
       }
 
-      // Request Body
       if (op.requestBody && op.requestBody.content) {
         buffer.push(`      request:`);
         const content = op.requestBody.content;
@@ -327,80 +364,53 @@ export async function generate(src: string, outputFile: string) {
         }
       }
 
-      buffer.push(`    };`); // End Route Object
+      buffer.push(`    };`);
     }
 
-    buffer.push(`  };`); // End Method Object
+    buffer.push(`  };`);
   }
 
   buffer.push(`}`);
   buffer.push("");
 
-  // 4. Update Generic Types for the new hierarchy
-  buffer.push(`export type Options<M extends keyof ApiTree, P extends keyof ApiTree[M]> = {
-  path: P;
-} & ("params" extends keyof ApiTree[M][P]
-  ? { params: ApiTree[M][P]["params"] }
-  : {}) &
-  ("request" extends keyof ApiTree[M][P]
-    ? ApiTree[M][P]["request"]
-    : {}) &
-  ("query" extends keyof ApiTree[M][P]
-    ? {} extends ApiTree[M][P]["query"]
-      ? { query?: ApiTree[M][P]["query"] }
-      : { query: ApiTree[M][P]["query"] }
-    : {});
-
-export type Return<M extends keyof ApiTree, P extends keyof ApiTree[M]> =
-  "response" extends keyof ApiTree[M][P]
-    ? ApiTree[M][P]["response"]
-    : Promise<void>;`);
-
-  buffer.push(`
-export type K = {
-  [M in keyof ApiTree]: <P extends keyof ApiTree[M]>(
-    options: Options<M, P>
-  ) => Return<M, P>;
-};
-`);
-
   const code = buffer.join("\n");
   const formatted = await prettier.format(code, { parser: "typescript" });
 
-  fs.writeFileSync(outputFile, formatted);
-  console.info(`Successfully generated ${outputFile}`);
+  if (typesPath) {
+    ensureDirExists(typesPath);
+    writeFileSync(typesPath, formatted);
+    console.info(`Successfully generated ${typesPath}`);
+  }
+
+  if (zodPath) {
+    ensureDirExists(zodPath);
+    try {
+      spawnSync("npx", ["openapi-zod-client", src, "-o", zodPath], {
+        stdio: "inherit",
+      });
+      console.info(`Successfully generated ${zodPath}`);
+    } catch (e) {
+      console.error(`Failed to generate zod schema: ${e}`);
+      process.exit(1);
+    }
+  }
 }
 
 async function main() {
   const src = process.argv[2];
-  let out = process.argv[3];
-
-  if (!out) {
-    try {
-      const pkgPath = path.resolve(process.cwd(), "package.json");
-      if (fs.existsSync(pkgPath)) {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-        if (pkg.kygger && pkg.kygger.output) {
-          out = pkg.kygger.output;
-        }
-      }
-    } catch (e) {
-      // Ignore errors reading package.json
-    }
-  }
-
-  if (!out) {
-    out = "kygger.types.ts";
-  }
+  const outputFolder = process.argv[3];
 
   if (!src) {
-    console.error("Usage: kygger <source-url-or-file> [output-path]");
+    console.error("Usage: kygger <source-url-or-file> [output-folder]");
     process.exit(1);
   }
-  await generate(src, path.resolve(process.cwd(), out));
+
+  await generate(src, outputFolder);
 }
 
-const isMain = process.argv[1]?.endsWith("generator.ts") || process.argv[1]?.endsWith("kygger");
+const isMain =
+  process.argv[1]?.endsWith("generator.ts") ||
+  process.argv[1]?.endsWith("kygger");
 
 if (isMain) {
   main().catch((e) => {

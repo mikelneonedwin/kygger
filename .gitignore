@@ -4,3 +4,6 @@ dist
 .env.local
 *.log
 src/api.types.ts
+api.types.ts
+api.zod.ts
+note.ts
