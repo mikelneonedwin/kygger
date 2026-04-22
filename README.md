@@ -16,10 +16,22 @@ npm install kygger
 npx kygger <openapi-spec-url-or-file> [output-path]
 ```
 
+By default, if `output-path` is not provided, it writes to `kygger.types.ts`.
+
+You can also configure the output path in your `package.json`:
+
+```json
+{
+  "kygger": {
+    "output": "src/api.types.ts"
+  }
+}
+```
+
 Example:
 
 ```bash
-npx kygger https://api.example.com/docs-json src/api.types.ts
+npx kygger https://api.example.com/docs-json
 ```
 
 ### Create Client
