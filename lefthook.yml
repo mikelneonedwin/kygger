@@ -1,0 +1,24 @@
+# EXAMPLE USAGE:
+#
+#   Refer for explanation to following link:
+#   https://lefthook.dev/configuration/
+#
+pre-push:
+  jobs:
+    - name: build
+      run: npm run build
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: "lint"
+      run: npx eslint --fix --no-warn-ignored {staged_files}
+      glob: "*.{js,ts,jsx,tsx}"
+
+    - name: "format"
+      run: npx prettier --write --log-level silent {staged_files}
+      glob: "*.{js,ts,jsx,tsx,json,yml,md}"
+
+    - name: "typecheck"
+      run: npx tsc --noEmit
+      glob: "*.{js,ts,jsx,tsx}"
