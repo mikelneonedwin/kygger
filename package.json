@@ -14,12 +14,12 @@
   ],
   "scripts": {
     "build": "tsup src/index.ts src/generator.ts --format cjs,esm --dts --clean",
-    "dev": "tsup src/index.ts src/generator.ts --format cjs,esm --watch --dts",
+    "dev": "bun run src/generator.ts",
     "prepublishOnly": "npm run build",
     "lint": "eslint --fix",
     "format": "prettier --write",
     "typecheck": "tsc --noEmit",
-    "prepare": "lefthook install",
+    "prepare": "lefthook install"
   },
   "dependencies": {
     "ky": "^1.14.3",
