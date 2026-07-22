@@ -44,3 +44,33 @@ export type Return<
 > = Tree[Method][Path] extends { response: infer R }
   ? ResponsePromise<R extends KyResponse<infer Data> ? Data : any>
   : ResponsePromise<any>;
+
+export type Query<
+  Tree extends ImplicitKyggerTree,
+  Method extends keyof Tree,
+  Path extends keyof Tree[Method],
+> = Tree[Method][Path] extends { query: infer Q } ? Q : undefined;
+
+export type Params<
+  Tree extends ImplicitKyggerTree,
+  Method extends keyof Tree,
+  Path extends keyof Tree[Method],
+> = Tree[Method][Path] extends { params: infer P } ? P : undefined;
+
+export type Request<
+  Tree extends ImplicitKyggerTree,
+  Method extends keyof Tree,
+  Path extends keyof Tree[Method],
+> = Tree[Method][Path] extends { request: infer Req } ? Req : undefined;
+
+export type Response<
+  Tree extends ImplicitKyggerTree,
+  Method extends keyof Tree,
+  Path extends keyof Tree[Method],
+> = Tree[Method][Path] extends { response: infer Res } ? Res : undefined;
+
+export type Endpoint<
+  Tree extends ImplicitKyggerTree,
+  Method extends keyof Tree,
+  Path extends keyof Tree[Method],
+> = Tree[Method][Path];
