@@ -25,10 +25,10 @@ npx kygger ./swagger.json -t ./src/api.types.ts
 
 ### CLI Flags
 
-| Flag | Short | Description | Default |
-| --- | --- | --- | --- |
-| `--types` | `-t` | Output path for generated TypeScript types file | `./api.types.ts` |
-| `--zod` | `-z` | Output path for generated Zod schemas file | `./api.zod.ts` |
+| Flag      | Short | Description                                     | Default          |
+| --------- | ----- | ----------------------------------------------- | ---------------- |
+| `--types` | `-t`  | Output path for generated TypeScript types file | `./api.types.ts` |
+| `--zod`   | `-z`  | Output path for generated Zod schemas file      | `./api.zod.ts`   |
 
 ---
 
@@ -71,13 +71,7 @@ const clonedResponse = response.clone();
 `kygger` exports convenient helper generics to extract specific parameter or response types for any endpoint in your `KyggerTree`:
 
 ```typescript
-import type {
-  Query,
-  Params,
-  Request,
-  Response,
-  Endpoint,
-} from "kygger";
+import type { Query, Params, Request, Response, Endpoint } from "kygger";
 import type { KyggerTree } from "./api.types";
 
 // Extract query parameters for an endpoint
@@ -104,4 +98,3 @@ type UserEndpointSchema = Endpoint<KyggerTree, "get", "/users/{id}">;
 - **Unrestricted `Response` Access**: Method return types are wrapped in `KyResponse<T>`, giving you strongly typed `.json()` while preserving `.blob()`, `.text()`, `.clone()`, `.formData()`, `.body`, `.status`, etc.
 - **CLI Options**: Custom `--types`/`-t` and `--zod`/`-z` output paths.
 - **Helper Generics**: Exported `Query`, `Params`, `Request`, `Response`, and `Endpoint` helper types for clean integration in React Query or custom state handlers.
-
