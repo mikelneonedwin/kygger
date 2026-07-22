@@ -1,10 +1,10 @@
 #!/usr/bin/env tsx
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 import * as prettier from "prettier";
-import { parseKyggerConfig, resolveOutputPaths } from "./config.js";
 
 export function ensureDirExists(filePath: string): void {
   const dir = dirname(filePath);
@@ -226,47 +226,22 @@ function generateQueryParamsType(
   return `{\n${props.join("\n")}\n}`;
 }
 
+export interface GenerateOptions {
+  typesPath?: string;
+  zodPath?: string;
+}
+
 export async function generate(
   src: string,
-  outputFolder?: string,
+  options: GenerateOptions = {},
 ): Promise<void> {
   const cwd = process.cwd();
-  let typesPath: string | null = null;
-  let zodPath: string | null = null;
-
-  if (outputFolder) {
-    typesPath = join(outputFolder, "api.types.ts");
-    zodPath = join(outputFolder, "api.zod.ts");
-  } else {
-    try {
-      const pkgPath = resolve(cwd, "package.json");
-      if (existsSync(pkgPath)) {
-        const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-        if (pkg.kygger) {
-          const config = parseKyggerConfig(pkg.kygger);
-          const { typesPath: tp, zodPath: zp } = resolveOutputPaths(
-            config,
-            cwd,
-          );
-          typesPath = tp;
-          zodPath = zp;
-        }
-      }
-    } catch (e) {
-      const error = e as Error;
-      if (
-        e instanceof Error &&
-        error.message.startsWith("Invalid kygger configuration")
-      ) {
-        console.error(error.message);
-        process.exit(1);
-      }
-    }
-  }
+  let typesPath = options.typesPath ? resolve(cwd, options.typesPath) : null;
+  let zodPath = options.zodPath ? resolve(cwd, options.zodPath) : null;
 
   if (!typesPath && !zodPath) {
-    typesPath = join(cwd, "api.types.ts");
-    zodPath = join(cwd, "api.zod.ts");
+    typesPath = resolve(cwd, "api.types.ts");
+    zodPath = resolve(cwd, "api.zod.ts");
   }
 
   const jsonText = await getTextContent(src);
@@ -274,6 +249,7 @@ export async function generate(
   const buffer: string[] = [];
 
   buffer.push(`/* eslint-disable */`);
+  buffer.push(`import type { KyResponse } from "ky";\n`);
   buffer.push(`// --- Generated Types from OpenAPI Spec --- \n`);
 
   if (spec.components?.schemas) {
@@ -334,9 +310,7 @@ export async function generate(
             successResponse.content["application/json"].schema,
             spec,
           );
-          buffer.push(`      response: {`);
-          buffer.push(`        json: () => Promise<${returnType}>;`);
-          buffer.push(`      };`);
+          buffer.push(`      response: KyResponse<${returnType}>;`);
         }
       }
 
@@ -397,15 +371,35 @@ export async function generate(
 }
 
 async function main() {
-  const src = process.argv[2];
-  const outputFolder = process.argv[3];
+  const args = process.argv.slice(2);
+  const { values, positionals } = parseArgs({
+    args,
+    options: {
+      types: {
+        type: "string",
+        short: "t",
+      },
+      zod: {
+        type: "string",
+        short: "z",
+      },
+    },
+    allowPositionals: true,
+  });
+
+  const src = positionals[0];
 
   if (!src) {
-    console.error("Usage: kygger <source-url-or-file> [output-folder]");
+    console.error(
+      "Usage: kygger <source-url-or-file> [--types|-t path.ts] [--zod|-z path.ts]",
+    );
     process.exit(1);
   }
 
-  await generate(src, outputFolder);
+  await generate(src, {
+    typesPath: values.types,
+    zodPath: values.zod,
+  });
 }
 
 const isMain =

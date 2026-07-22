@@ -1,10 +1,11 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
+/* eslint-disable @typescript-eslint/no-empty-object-type, @typescript-eslint/no-explicit-any */
+import type { KyResponse, ResponsePromise } from "ky";
 
 interface EndpointSchema {
   params?: Record<string, string>;
   query?: Record<string, unknown>;
-  request?: { json: unknown };
-  response?: { json: () => Promise<unknown> };
+  request?: { json?: unknown; body?: unknown };
+  response?: KyResponse<unknown>;
   pathname: string;
 }
 
@@ -40,6 +41,6 @@ export type Return<
   Tree extends ImplicitKyggerTree,
   Method extends keyof Tree,
   Path extends keyof Tree[Method],
-> = "response" extends keyof Tree[Method][Path]
-  ? Tree[Method][Path]["response"]
-  : Promise<void>;
+> = Tree[Method][Path] extends { response: infer R }
+  ? ResponsePromise<R extends KyResponse<infer Data> ? Data : any>
+  : ResponsePromise<any>;
