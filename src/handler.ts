@@ -1,4 +1,4 @@
-import { KyInstance } from "ky";
+import type { KyInstance } from "ky";
 import { HTTPMethods, ImplicitKyggerTree, Options } from "./types";
 
 export function handler<

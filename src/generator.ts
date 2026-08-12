@@ -249,6 +249,7 @@ export async function generate(
   const buffer: string[] = [];
 
   buffer.push(`/* eslint-disable */`);
+  buffer.push(`// @ts-nocheck`);
   buffer.push(`import type { KyResponse } from "ky";\n`);
   buffer.push(`// --- Generated Types from OpenAPI Spec --- \n`);
 
