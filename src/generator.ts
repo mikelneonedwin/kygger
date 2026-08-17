@@ -349,7 +349,13 @@ export async function generate(
   buffer.push("");
 
   const code = buffer.join("\n");
-  const formatted = await prettier.format(code, { parser: "typescript" });
+  const prettierOptions = typesPath
+    ? (await prettier.resolveConfig(typesPath)) || {}
+    : {};
+  const formatted = await prettier.format(code, {
+    ...prettierOptions,
+    parser: "typescript",
+  });
 
   if (typesPath) {
     ensureDirExists(typesPath);
