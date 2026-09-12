@@ -19,7 +19,8 @@
     "lint": "eslint --fix",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install",
+    "patch": "npm version patch && npm publish && git push --follow-tags"
   },
   "dependencies": {
     "openapi-zod-client": "^1.18.3",
