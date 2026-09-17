@@ -42,7 +42,7 @@ import { createApiClient } from "kygger";
 import type { KyggerTree } from "./api.types";
 
 const baseClient = ky.create({
-  prefixUrl: "https://api.example.com",
+  prefix: "https://api.example.com",
 });
 
 export const apiClient = createApiClient<KyggerTree>(baseClient);

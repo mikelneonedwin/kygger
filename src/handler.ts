@@ -8,7 +8,7 @@ export function handler<
   return function <Path extends keyof Tree[Method]>(
     options: Options<Tree, Method, Path>,
   ) {
-    // Remove leading slash if present for prefixUrl compatibility
+    // Remove leading slash if present for prefix compatibility
     let url = options.path.toString();
     if (url.startsWith("/")) {
       url = url.slice(1);
