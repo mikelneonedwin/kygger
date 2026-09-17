@@ -1,6 +1,6 @@
 {
   "name": "kygger",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "API types generator and client factory for OpenAPI",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
