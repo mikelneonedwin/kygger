@@ -383,9 +383,20 @@ export async function generate(
   if (zodPath) {
     ensureDirExists(zodPath);
     try {
-      spawnSync("npx", ["openapi-zod-client", src, "-o", zodPath], {
-        stdio: "inherit",
-      });
+      const result = spawnSync(
+        "npx",
+        ["openapi-zod-client", src, "-o", zodPath],
+        {
+          stdio: "inherit",
+          shell: true,
+        },
+      );
+      if (result.error) {
+        throw result.error;
+      }
+      if (result.status !== 0) {
+        process.exit(result.status ?? 1);
+      }
       console.info(`Successfully generated ${zodPath}`);
     } catch (e) {
       console.error(`Failed to generate zod schema: ${e}`);
@@ -394,7 +405,7 @@ export async function generate(
   }
 }
 
-async function main() {
+export async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const { values, positionals } = parseArgs({
     args,
@@ -428,7 +439,7 @@ async function main() {
 
 const isMain =
   process.argv[1]?.endsWith("generator.ts") ||
-  process.argv[1]?.endsWith("kygger");
+  /(?:^|[\\/])kygger(?:\.[cm]?[jt]s)?$/i.test(process.argv[1] ?? "");
 
 if (isMain) {
   main().catch((e) => {
