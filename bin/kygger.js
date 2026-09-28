@@ -11,12 +11,21 @@ const require = createRequire(import.meta.url);
 const generatorPath = join(__dirname, "../dist/generator.js");
 
 // Use dynamic import to run the compiled ESM generator
-import(generatorPath).catch((err1) => {
-  // Fallback to require if ESM fails (though tsup generates both)
-  try {
-    require(generatorPath);
-  } catch (err2) {
-    console.error("Failed to load generator:", err1, err2);
-    process.exit(1);
-  }
-});
+import(generatorPath)
+  .then((mod) => {
+    if (typeof mod.main === "function") {
+      return mod.main();
+    }
+  })
+  .catch((err1) => {
+    // Fallback to require if ESM fails (though tsup generates both)
+    try {
+      const mod = require(generatorPath);
+      if (typeof mod.main === "function") {
+        return mod.main();
+      }
+    } catch (err2) {
+      console.error("Failed to load generator:", err1, err2);
+      process.exit(1);
+    }
+  });
