@@ -14,10 +14,12 @@ pre-commit:
     - name: "lint"
       run: npx eslint --fix --no-warn-ignored {staged_files}
       glob: "*.{js,ts,jsx,tsx}"
+      stage_fixed: true
 
     - name: "format"
       run: npx prettier --write --log-level silent {staged_files}
       glob: "*.{js,ts,jsx,tsx,json,yml,md}"
+      stage_fixed: true
 
     - name: "typecheck"
       run: npx tsc --noEmit

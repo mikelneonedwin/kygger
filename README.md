@@ -10,17 +10,17 @@ npm install kygger ky
 
 ## CLI Usage
 
-Generate TypeScript types and Zod schemas directly from an OpenAPI 3.0 specification file or URL:
+Generate TypeScript types directly from an OpenAPI 3.0 specification file or URL:
 
 ```bash
-# Generate types and zod schemas with custom paths
-npx kygger <openapi-spec-url-or-file> --types ./src/api.types.ts --zod ./src/api.zod.ts
+# Generate types with custom path
+npx kygger <openapi-spec-url-or-file> --types ./src/api.types.ts
 
 # Short flags
-npx kygger https://api.example.com/openapi.json -t ./src/api.types.ts -z ./src/api.zod.ts
+npx kygger https://api.example.com/openapi.json -t ./src/api.types.ts
 
-# Generate only types
-npx kygger ./swagger.json -t ./src/api.types.ts
+# Default output (generates ./api.types.ts)
+npx kygger ./swagger.json
 ```
 
 ### CLI Flags
@@ -28,7 +28,6 @@ npx kygger ./swagger.json -t ./src/api.types.ts
 | Flag      | Short | Description                                     | Default          |
 | --------- | ----- | ----------------------------------------------- | ---------------- |
 | `--types` | `-t`  | Output path for generated TypeScript types file | `./api.types.ts` |
-| `--zod`   | `-z`  | Output path for generated Zod schemas file      | `./api.zod.ts`   |
 
 ---
 
@@ -96,5 +95,5 @@ type UserEndpointSchema = Endpoint<KyggerTree, "get", "/users/{id}">;
 
 - **End-to-End Type Safety**: Strongly-typed paths, path parameters (`params`), query parameters (`query`), and request bodies (`json` or `FormData`).
 - **Unrestricted `Response` Access**: Method return types are wrapped in `KyResponse<T>`, giving you strongly typed `.json()` while preserving `.blob()`, `.text()`, `.clone()`, `.formData()`, `.body`, `.status`, etc.
-- **CLI Options**: Custom `--types`/`-t` and `--zod`/`-z` output paths.
+- **CLI Options**: Custom `--types`/`-t` output path (defaults to `./api.types.ts`).
 - **Helper Generics**: Exported `Query`, `Params`, `Request`, `Response`, and `Endpoint` helper types for clean integration in React Query or custom state handlers.

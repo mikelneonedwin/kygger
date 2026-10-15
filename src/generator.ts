@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -228,7 +227,6 @@ function generateQueryParamsType(
 
 export interface GenerateOptions {
   typesPath?: string;
-  zodPath?: string;
 }
 
 export async function generate(
@@ -236,13 +234,7 @@ export async function generate(
   options: GenerateOptions = {},
 ): Promise<void> {
   const cwd = process.cwd();
-  let typesPath = options.typesPath ? resolve(cwd, options.typesPath) : null;
-  let zodPath = options.zodPath ? resolve(cwd, options.zodPath) : null;
-
-  if (!typesPath && !zodPath) {
-    typesPath = resolve(cwd, "api.types.ts");
-    zodPath = resolve(cwd, "api.zod.ts");
-  }
+  const typesPath = resolve(cwd, options.typesPath || "api.types.ts");
 
   const jsonText = await getTextContent(src);
   const spec: OpenApiSpec = JSON.parse(jsonText);
@@ -374,35 +366,9 @@ export async function generate(
     parser: "typescript",
   });
 
-  if (typesPath) {
-    ensureDirExists(typesPath);
-    writeFileSync(typesPath, formatted);
-    console.info(`Successfully generated ${typesPath}`);
-  }
-
-  if (zodPath) {
-    ensureDirExists(zodPath);
-    try {
-      const result = spawnSync(
-        "npx",
-        ["openapi-zod-client", src, "-o", zodPath],
-        {
-          stdio: "inherit",
-          shell: true,
-        },
-      );
-      if (result.error) {
-        throw result.error;
-      }
-      if (result.status !== 0) {
-        process.exit(result.status ?? 1);
-      }
-      console.info(`Successfully generated ${zodPath}`);
-    } catch (e) {
-      console.error(`Failed to generate zod schema: ${e}`);
-      process.exit(1);
-    }
-  }
+  ensureDirExists(typesPath);
+  writeFileSync(typesPath, formatted);
+  console.info(`Successfully generated ${typesPath}`);
 }
 
 export async function main(): Promise<void> {
@@ -414,10 +380,6 @@ export async function main(): Promise<void> {
         type: "string",
         short: "t",
       },
-      zod: {
-        type: "string",
-        short: "z",
-      },
     },
     allowPositionals: true,
   });
@@ -425,15 +387,12 @@ export async function main(): Promise<void> {
   const src = positionals[0];
 
   if (!src) {
-    console.error(
-      "Usage: kygger <source-url-or-file> [--types|-t path.ts] [--zod|-z path.ts]",
-    );
+    console.error("Usage: kygger <source-url-or-file> [--types|-t path.ts]");
     process.exit(1);
   }
 
   await generate(src, {
     typesPath: values.types,
-    zodPath: values.zod,
   });
 }
 
