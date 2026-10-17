@@ -5,7 +5,7 @@ interface EndpointSchema {
   params?: Record<string, string>;
   query?: Record<string, unknown>;
   request?: { json?: unknown; body?: unknown };
-  response?: KyResponse<unknown> | KyggerResponse<unknown>;
+  response?: KyResponse<unknown> | KyggerResponse<unknown, any>;
   pathname: string;
 }
 
@@ -37,30 +37,37 @@ export type Options<
       : { query: Tree[Method][Path]["query"] }
     : {});
 
-export type KyggerResponse<T = unknown> = Omit<KyResponse<T>, "json"> & {
+export type KyggerResponse<T = unknown, Status extends number = number> = Omit<
+  KyResponse<T>,
+  "json" | "status"
+> & {
+  status: Status;
   json(): Promise<T>;
 };
 
-export type KyggerResponsePromise<T = unknown> = Omit<
+export type KyggerResponsePromise<T = unknown, R = KyggerResponse<T>> = Omit<
   ResponsePromise<T>,
   "json" | "then" | "catch" | "finally"
 > & {
   json(): Promise<T>;
-} & Promise<KyggerResponse<T>>;
+} & Promise<R>;
+
+type ExtractResponseData<R> =
+  R extends KyggerResponse<infer Data, any>
+    ? Data
+    : R extends KyResponse<infer Data>
+      ? Data
+      : any;
 
 export type Return<
   Tree extends ImplicitKyggerTree,
   Method extends keyof Tree,
   Path extends keyof Tree[Method],
 > = Tree[Method][Path] extends { response: infer R }
-  ? KyggerResponsePromise<
-      R extends KyResponse<infer Data>
-        ? Data
-        : R extends KyggerResponse<infer Data>
-          ? Data
-          : any
-    >
-  : KyggerResponsePromise<any>;
+  ? [R] extends [never]
+    ? KyggerResponsePromise<any, any>
+    : KyggerResponsePromise<ExtractResponseData<R>, R>
+  : KyggerResponsePromise<any, any>;
 
 export type Query<
   Tree extends ImplicitKyggerTree,
