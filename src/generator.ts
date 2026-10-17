@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import * as prettier from "prettier";
+import yaml from "yaml";
 
 export function ensureDirExists(filePath: string): void {
   const dir = dirname(filePath);
@@ -40,12 +41,39 @@ export async function getTextContent(input: string): Promise<string> {
   return readFileSync(absolutePath, "utf-8");
 }
 
-interface OpenApiSpec {
+export interface OpenApiSpec {
   openapi: string;
   paths: Record<string, PathItem>;
   components?: {
     schemas?: Record<string, SchemaObject>;
   };
+}
+
+export function parseSpecContent(rawText: string, src: string): OpenApiSpec {
+  const isYaml = /\.ya?ml($|\?)/i.test(src);
+  if (isYaml) {
+    const parsed = yaml.parse(rawText);
+    if (!parsed || typeof parsed !== "object") {
+      throw new Error(`Failed to parse OpenAPI YAML spec from: ${src}`);
+    }
+    return parsed as OpenApiSpec;
+  }
+
+  try {
+    return JSON.parse(rawText) as OpenApiSpec;
+  } catch {
+    try {
+      const parsed = yaml.parse(rawText);
+      if (parsed && typeof parsed === "object") {
+        return parsed as OpenApiSpec;
+      }
+    } catch {
+      // Fall through to final error
+    }
+    throw new Error(
+      `Failed to parse OpenAPI spec from "${src}". The content must be valid JSON or YAML.`,
+    );
+  }
 }
 
 interface PathItem {
@@ -236,8 +264,8 @@ export async function generate(
   const cwd = process.cwd();
   const typesPath = resolve(cwd, options.typesPath || "api.types.ts");
 
-  const jsonText = await getTextContent(src);
-  const spec: OpenApiSpec = JSON.parse(jsonText);
+  const rawText = await getTextContent(src);
+  const spec: OpenApiSpec = parseSpecContent(rawText, src);
   const buffer: string[] = [];
 
   buffer.push(`/**

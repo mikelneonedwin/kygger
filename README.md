@@ -82,14 +82,14 @@ npm install kygger ky
 
 ### 1. Generate Types from Your OpenAPI Spec
 
-Run `kygger` against your local spec file or live API endpoint:
+Run `kygger` against your local spec file (JSON or YAML) or live API endpoint:
 
 ```bash
-# From a remote URL
-npx kygger https://api.example.com/openapi.json -t ./src/api.types.ts
+# From a remote URL (JSON or YAML)
+npx kygger https://api.example.com/openapi.yaml -t ./src/api.types.ts
 
 # From a local specification file
-npx kygger ./swagger.json -t ./src/api.types.ts
+npx kygger ./swagger.yaml -t ./src/api.types.ts
 ```
 
 ### 2. Create Your API Client
