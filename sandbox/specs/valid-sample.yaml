@@ -1,0 +1,99 @@
+openapi: 3.0.3
+info:
+  title: Comprehensive Test API YAML
+  version: 1.0.0
+paths:
+  /courses:
+    post:
+      operationId: createOrGetCourse
+      summary: Create course or return existing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCourseDto'
+      responses:
+        '201':
+          description: Course newly created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseCreatedDto'
+        '200':
+          description: Course already existed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseExistingDto'
+  /courses/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getCourse
+      responses:
+        '200':
+          description: Course details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDetailDto'
+    delete:
+      operationId: deleteCourse
+      responses:
+        '204':
+          description: Course deleted successfully
+components:
+  schemas:
+    CreateCourseDto:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+      required:
+        - title
+    CourseCreatedDto:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - title
+        - createdAt
+    CourseExistingDto:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        alreadyEnrolled:
+          type: boolean
+      required:
+        - id
+        - title
+        - alreadyEnrolled
+    CourseDetailDto:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        duration:
+          type: number
+      required:
+        - id
+        - title
+        - duration

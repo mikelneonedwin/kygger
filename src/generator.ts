@@ -229,7 +229,7 @@ function generatePathParamsType(
     const type =
       schemaType === "integer" || schemaType === "number" ? "number" : "string";
 
-    return `${paramName}: ${type};`;
+    return `"${paramName}": ${type};`;
   });
 
   return `{\n${props.join("\n")}\n}`;

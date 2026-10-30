@@ -19,8 +19,10 @@
     "lint": "eslint --fix",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
+    "test": "bun test",
     "prepare": "lefthook install",
     "patch": "npm whoami && npm version patch && npm publish && git push --follow-tags",
+    "minor": "npm whoami && npm version minor && npm publish && git push --follow-tags",
     "major": "npm whoami && npm version major && npm publish && git push --follow-tags"
   },
   "dependencies": {

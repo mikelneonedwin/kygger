@@ -81,10 +81,21 @@ export function formatDiagnostics(
       const warnCount = diagnostics.filter(
         (d) => d.severity === "warning",
       ).length;
+      const infoCount = diagnostics.filter((d) => d.severity === "info").length;
+
+      const summaryParts: string[] = [];
+      if (errorCount > 0)
+        summaryParts.push(`${errorCount} error${errorCount === 1 ? "" : "s"}`);
+      if (warnCount > 0)
+        summaryParts.push(`${warnCount} warning${warnCount === 1 ? "" : "s"}`);
+      if (infoCount > 0) summaryParts.push(`${infoCount} info`);
+
+      const summaryText =
+        summaryParts.length > 0 ? summaryParts.join(", ") : "0 issues";
 
       lines.push("");
       lines.push(
-        `⚠️  Kygger Spec Diagnostics (${diagnostics.length} issue${diagnostics.length === 1 ? "" : "s"} found: ${errorCount} error${errorCount === 1 ? "" : "s"}, ${warnCount} warning${warnCount === 1 ? "" : "s"}):`,
+        `⚠️  Kygger Spec Diagnostics (${diagnostics.length} issue${diagnostics.length === 1 ? "" : "s"} found: ${summaryText}):`,
       );
       lines.push("");
 
@@ -92,7 +103,9 @@ export function formatDiagnostics(
         const tag =
           d.severity === "error"
             ? "\x1b[31m[ERROR]\x1b[0m"
-            : "\x1b[33m[WARN]\x1b[0m";
+            : d.severity === "warning"
+              ? "\x1b[33m[WARN]\x1b[0m"
+              : "\x1b[34m[INFO]\x1b[0m";
         const target = d.endpoint
           ? `${d.endpoint.method} ${d.endpoint.path}`
           : d.specPath;

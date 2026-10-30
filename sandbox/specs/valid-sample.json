@@ -1,0 +1,303 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Comprehensive Test API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/courses": {
+      "post": {
+        "operationId": "createOrGetCourse",
+        "summary": "Create course or return existing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCourseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Course newly created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseCreatedDto"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Course already existed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseExistingDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/courses/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getCourse",
+        "responses": {
+          "200": {
+            "description": "Course details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CourseDetailDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteCourse",
+        "responses": {
+          "204": {
+            "description": "Course deleted successfully"
+          }
+        }
+      }
+    },
+    "/orgs/{orgId}/departments/{deptId}": {
+      "parameters": [
+        {
+          "name": "orgId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "apiKey",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getDepartment",
+        "parameters": [
+          {
+            "name": "deptId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Department info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tags/{tag-name}": {
+      "parameters": [
+        {
+          "name": "tag-name",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getTag",
+        "responses": {
+          "200": {
+            "description": "Tag details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tag": { "type": "string" },
+                    "count": { "type": "number" }
+                  },
+                  "required": ["tag", "count"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/{reportId}/download": {
+      "parameters": [
+        {
+          "name": "reportId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "downloadReport",
+        "responses": {
+          "200": {
+            "description": "PDF Report binary",
+            "content": {
+              "application/pdf": {}
+            }
+          }
+        }
+      }
+    },
+    "/metrics/export": {
+      "get": {
+        "operationId": "exportMetrics",
+        "responses": {
+          "200": {
+            "description": "CSV export",
+            "content": {
+              "text/csv": {}
+            }
+          }
+        }
+      }
+    },
+    "/live-feed": {
+      "get": {
+        "operationId": "getLiveFeed",
+        "responses": {
+          "200": {
+            "description": "SSE stream",
+            "content": {
+              "text/event-stream": {}
+            }
+          }
+        }
+      }
+    },
+    "/files/upload": {
+      "post": {
+        "operationId": "uploadFile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {}
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Upload success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResultDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateCourseDto": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "description": { "type": "string" }
+        },
+        "required": ["title"]
+      },
+      "CourseCreatedDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "createdAt": { "type": "string" }
+        },
+        "required": ["id", "title", "createdAt"]
+      },
+      "CourseExistingDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "alreadyEnrolled": { "type": "boolean" }
+        },
+        "required": ["id", "title", "alreadyEnrolled"]
+      },
+      "CourseDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "duration": { "type": "number" }
+        },
+        "required": ["id", "title", "duration"]
+      },
+      "DepartmentDto": {
+        "type": "object",
+        "properties": {
+          "orgId": { "type": "string" },
+          "deptId": { "type": "string" },
+          "name": { "type": "string" }
+        },
+        "required": ["orgId", "deptId", "name"]
+      },
+      "UploadResultDto": {
+        "type": "object",
+        "properties": {
+          "fileUrl": { "type": "string" },
+          "sizeBytes": { "type": "number" }
+        },
+        "required": ["fileUrl", "sizeBytes"]
+      }
+    }
+  }
+}
