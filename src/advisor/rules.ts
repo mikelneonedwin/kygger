@@ -212,8 +212,8 @@ export function runDiagnostics(spec: SpecLike): Diagnostic[] {
         const lowerOpId = (op.operationId ?? "").toLowerCase();
         const isDestructive =
           /\/(?:delete|destroy|remove|purge|cancel)(?:\/|$)/.test(lowerRoute) ||
-          lowerSummary.startsWith("delete") ||
-          lowerOpId.startsWith("delete");
+          /(?:delete|destroy|remove|purge|cancel)/.test(lowerSummary) ||
+          /(?:delete|destroy|remove|purge|cancel)/.test(lowerOpId);
 
         if (isDestructive) {
           diagnostics.push({
