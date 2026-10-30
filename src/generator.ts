@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import * as prettier from "prettier";
+import yaml from "yaml";
 import { formatDiagnostics } from "./advisor/reporter";
 import { runDiagnostics } from "./advisor/rules";
 import type { ReportFormat } from "./advisor/types";
@@ -43,12 +44,39 @@ export async function getTextContent(input: string): Promise<string> {
   return readFileSync(absolutePath, "utf-8");
 }
 
-interface OpenApiSpec {
+export interface OpenApiSpec {
   openapi: string;
   paths: Record<string, PathItem>;
   components?: {
     schemas?: Record<string, SchemaObject>;
   };
+}
+
+export function parseSpecContent(rawText: string, src: string): OpenApiSpec {
+  const isYaml = /\.ya?ml($|\?)/i.test(src);
+  if (isYaml) {
+    const parsed = yaml.parse(rawText);
+    if (!parsed || typeof parsed !== "object") {
+      throw new Error(`Failed to parse OpenAPI YAML spec from: ${src}`);
+    }
+    return parsed as OpenApiSpec;
+  }
+
+  try {
+    return JSON.parse(rawText) as OpenApiSpec;
+  } catch {
+    try {
+      const parsed = yaml.parse(rawText);
+      if (parsed && typeof parsed === "object") {
+        return parsed as OpenApiSpec;
+      }
+    } catch {
+      // Fall through to final error
+    }
+    throw new Error(
+      `Failed to parse OpenAPI spec from "${src}". The content must be valid JSON or YAML.`,
+    );
+  }
 }
 
 interface PathItem {
@@ -297,6 +325,8 @@ function parseResponseType(
 
 export interface GenerateOptions {
   typesPath?: string;
+  diagnostics?: boolean;
+  advisor?: boolean;
   quiet?: boolean;
   strict?: boolean;
   report?: ReportFormat;
@@ -310,8 +340,8 @@ export async function generate(
   const cwd = process.cwd();
   const typesPath = resolve(cwd, options.typesPath || "api.types.ts");
 
-  const jsonText = await getTextContent(src);
-  const spec: OpenApiSpec = JSON.parse(jsonText);
+  const rawText = await getTextContent(src);
+  const spec: OpenApiSpec = parseSpecContent(rawText, src);
   const buffer: string[] = [];
 
   buffer.push(`/**
@@ -443,41 +473,55 @@ export async function generate(
   writeFileSync(typesPath, formatted);
   console.info(`Successfully generated ${typesPath}`);
 
-  const diagnostics = runDiagnostics(
-    spec as unknown as Parameters<typeof runDiagnostics>[0],
+  const isDiagnosticsEnabled = Boolean(
+    options.diagnostics ||
+    options.advisor ||
+    options.strict ||
+    options.report ||
+    options.reportFile ||
+    process.env.KYGGER_DIAGNOSTICS === "true" ||
+    process.env.KYGGER_DIAGNOSTICS === "1" ||
+    process.env.KYGGER_ADVISOR === "true" ||
+    process.env.KYGGER_ADVISOR === "1",
   );
-  const isQuiet =
-    options.quiet ??
-    (process.env.KYGGER_QUIET === "true" || process.env.KYGGER_QUIET === "1");
 
-  if (options.reportFile) {
-    const reportFormat = options.report ?? "markdown";
-    const reportContent = formatDiagnostics(diagnostics, reportFormat);
-    const resolvedReportPath = resolve(cwd, options.reportFile);
-    ensureDirExists(resolvedReportPath);
-    writeFileSync(resolvedReportPath, reportContent);
-    console.info(`Exported diagnostic report to ${resolvedReportPath}`);
-  }
-
-  if (!isQuiet) {
-    const consoleOutput = formatDiagnostics(
-      diagnostics,
-      options.report ?? "console",
+  if (isDiagnosticsEnabled) {
+    const diagnostics = runDiagnostics(
+      spec as unknown as Parameters<typeof runDiagnostics>[0],
     );
-    if (consoleOutput) {
-      console.log(consoleOutput);
+    const isQuiet =
+      options.quiet ??
+      (process.env.KYGGER_QUIET === "true" || process.env.KYGGER_QUIET === "1");
+
+    if (options.reportFile) {
+      const reportFormat = options.report ?? "markdown";
+      const reportContent = formatDiagnostics(diagnostics, reportFormat);
+      const resolvedReportPath = resolve(cwd, options.reportFile);
+      ensureDirExists(resolvedReportPath);
+      writeFileSync(resolvedReportPath, reportContent);
+      console.info(`Exported diagnostic report to ${resolvedReportPath}`);
     }
-  }
 
-  if (options.strict) {
-    const hasErrorsOrWarnings = diagnostics.some(
-      (d) => d.severity === "error" || d.severity === "warning",
-    );
-    if (hasErrorsOrWarnings) {
-      console.error(
-        `Exiting with code 1 due to --strict flag (${diagnostics.length} diagnostic issue(s) detected).`,
+    if (!isQuiet) {
+      const consoleOutput = formatDiagnostics(
+        diagnostics,
+        options.report ?? "console",
       );
-      process.exit(1);
+      if (consoleOutput) {
+        console.log(consoleOutput);
+      }
+    }
+
+    if (options.strict) {
+      const hasErrorsOrWarnings = diagnostics.some(
+        (d) => d.severity === "error" || d.severity === "warning",
+      );
+      if (hasErrorsOrWarnings) {
+        console.error(
+          `Exiting with code 1 due to --strict flag (${diagnostics.length} diagnostic issue(s) detected).`,
+        );
+        process.exit(1);
+      }
     }
   }
 }
@@ -490,6 +534,14 @@ export async function main(): Promise<void> {
       types: {
         type: "string",
         short: "t",
+      },
+      diagnostics: {
+        type: "boolean",
+        short: "d",
+      },
+      advisor: {
+        type: "boolean",
+        short: "a",
       },
       quiet: {
         type: "boolean",
@@ -512,13 +564,15 @@ export async function main(): Promise<void> {
 
   if (!src) {
     console.error(
-      "Usage: kygger <source-url-or-file> [--types|-t path.ts] [--quiet|-q] [--strict] [--report console|markdown|json|prompt] [--report-file path]",
+      "Usage: kygger <source-url-or-file> [--types|-t path.ts] [--diagnostics|-d] [--advisor|-a] [--quiet|-q] [--strict] [--report console|markdown|json|prompt] [--report-file path]",
     );
     process.exit(1);
   }
 
   await generate(src, {
     typesPath: values.types,
+    diagnostics: values.diagnostics,
+    advisor: values.advisor,
     quiet: values.quiet,
     strict: values.strict,
     report: values.report as ReportFormat | undefined,

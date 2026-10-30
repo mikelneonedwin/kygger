@@ -14,8 +14,8 @@
 
 Modern web apps constantly suffer from **API type drift**:
 
-1. **Manual Types Drift Silently**: You write `interface UserDto { ... }` on the frontend. When the backend renames a field or changes an ID from `string` to `number`, your TypeScript compiles without warnings—until production crashes with `undefined is not a function`.
-2. **String URLs & Manual Formatting**: Constructing URLs like ``/api/v1/users/${id}?filter=${encodeURIComponent(query)}`` is error-prone. One typo in a query parameter or path segment breaks your request.
+1. **Manual Types Drift Silently**: You write `interface UserDto { ... }` on the frontend. When the backend renames a field or changes an ID from `string` to `number`, your TypeScript compiles without warnings, until production crashes with `undefined is not a function`.
+2. **String URLs & Manual Formatting**: Constructing URLs like `/api/v1/users/${id}?filter=${encodeURIComponent(query)}` is error-prone. One typo in a query parameter or path segment breaks your request.
 3. **Manual Generics Are Unenforced**: Calling `ky.get('/users').json<MyDto>()` doesn't verify that `/users` actually returns `MyDto`. The generic is just a blind type assertion (`as MyDto`).
 4. **Heavy SDK Generators Are Bloated**: Traditional OpenAPI generators produce hundreds of messy class files, opinionated wrappers, and bloated bundles that obscure the underlying HTTP response.
 
@@ -23,10 +23,10 @@ Modern web apps constantly suffer from **API type drift**:
 
 `kygger` bridges the gap between your OpenAPI contract and your HTTP client:
 
-* **Single Source of Truth**: Generates a single, compact `api.types.ts` tree directly from your OpenAPI specification.
-* **100% Autocompleted & Verified**: Route paths, path parameters (`params`), query parameters (`query`), and request bodies (`json` or `FormData`) are verified at compile time.
-* **Preserves Native Ky & Fetch Powers**: You are never locked into an opaque SDK. Kygger returns a real `KyResponse`, giving you direct access to `.blob()`, `.text()`, `.formData()`, `.headers`, `.status`, `.clone()`, and Ky's hook and retry architecture.
-* **Zero Runtime Bloat**: The generator only outputs TypeScript types. The client runtime is an ultra-lightweight (~1 KB) wrapper around Ky.
+- **Single Source of Truth**: Generates a single, compact `api.types.ts` tree directly from your OpenAPI specification.
+- **100% Autocompleted & Verified**: Route paths, path parameters (`params`), query parameters (`query`), and request bodies (`json` or `FormData`) are verified at compile time.
+- **Preserves Native Ky & Fetch Powers**: You are never locked into an opaque SDK. Kygger returns a real `KyResponse`, giving you direct access to `.blob()`, `.text()`, `.formData()`, `.headers`, `.status`, `.clone()`, and Ky's hook and retry architecture.
+- **Zero Runtime Bloat**: The generator only outputs TypeScript types. The client runtime is an ultra-lightweight (~1 KB) wrapper around Ky.
 
 ---
 
@@ -39,7 +39,9 @@ Modern web apps constantly suffer from **API type drift**:
 // ❌ Manual path string concatenation
 // ❌ Manual query parameter assembly
 // ❌ Unverified return type assertion (false sense of safety)
-const res = await ky.get(`https://api.example.com/users/${userId}?includePosts=true`);
+const res = await ky.get(
+  `https://api.example.com/users/${userId}?includePosts=true`,
+);
 const user = await res.json<UserDto>();
 ```
 
@@ -80,14 +82,14 @@ npm install kygger ky
 
 ### 1. Generate Types from Your OpenAPI Spec
 
-Run `kygger` against your local spec file or live API endpoint:
+Run `kygger` against your local spec file (JSON or YAML) or live API endpoint:
 
 ```bash
-# From a remote URL
-npx kygger https://api.example.com/openapi.json -t ./src/api.types.ts
+# From a remote URL (JSON or YAML)
+npx kygger https://api.example.com/openapi.yaml -t ./src/api.types.ts
 
 # From a local specification file
-npx kygger ./swagger.json -t ./src/api.types.ts
+npx kygger ./swagger.yaml -t ./src/api.types.ts
 ```
 
 ### 2. Create Your API Client
@@ -165,7 +167,7 @@ const textBody = await userResponse.text();
 
 ## OpenAPI Diagnostics & Best Practice Advisor
 
-Kygger audits your OpenAPI specification during generation to prevent silent runtime errors and guarantee end-to-end type safety:
+Kygger includes an opt-in advisor that audits your OpenAPI specification during generation to prevent silent runtime errors and guarantee end-to-end type safety:
 
 - **Empty 200 Responses**: Flags endpoints returning 200 without a response schema, suggesting `204 No Content` or `201 Created`.
 - **204 With Body**: Catches RFC 9110 violations where 204 responses define a body schema (which causes runtime JSON parse failures).
@@ -175,15 +177,18 @@ Kygger audits your OpenAPI specification during generation to prevent silent run
 - **Broken References**: Catches dangling `$ref` pointers before they cause TypeScript compiler errors.
 - **Destructive GETs**: Identifies destructive actions exposed over GET requests.
 
-### AI Prompt & CI Reports
+### Opt-In Diagnostics, AI Prompts & CI Reports
 
-Generate copy-paste instructions for your backend team or AI coding agent:
+Diagnostics is opt-in, keeping standard generation silent and focused. Enable diagnostics using `--diagnostics` (or `-d` / `--advisor` / `-a`), or by specifying a report format or strict mode:
 
 ```bash
-# Export AI-ready instructions
+# Run generation with OpenAPI diagnostics enabled in console
+npx kygger ./swagger.json --diagnostics
+
+# Export AI-ready remediation prompt
 npx kygger ./swagger.json --report prompt --report-file audit-prompt.md
 
-# CI strict mode
+# CI strict mode (fails with exit code 1 if errors or warnings exist)
 npx kygger ./swagger.json --strict
 ```
 
@@ -231,6 +236,8 @@ npx kygger <openapi-spec-url-or-file> [options]
 | Flag            | Short | Description                                                            | Default          |
 | :-------------- | :---- | :--------------------------------------------------------------------- | :--------------- |
 | `--types`       | `-t`  | Output path for generated TypeScript types file                        | `./api.types.ts` |
+| `--diagnostics` | `-d`  | Enable OpenAPI diagnostics and advisor checks (opt-in)                 | `false`          |
+| `--advisor`     | `-a`  | Alias for `--diagnostics`                                              | `false`          |
 | `--quiet`       | `-q`  | Suppress diagnostic messages and warnings (or set `KYGGER_QUIET=true`) | `false`          |
 | `--strict`      |       | Exit with non-zero exit code if warnings or errors are found           | `false`          |
 | `--report`      |       | Diagnostic output format (`console`, `markdown`, `json`, `prompt`)     | `console`        |
@@ -240,14 +247,14 @@ npx kygger <openapi-spec-url-or-file> [options]
 
 ## How It Compares
 
-| Feature | Raw `fetch` / `ky` | Heavy SDK Generators | `openapi-typescript` alone | **Kygger** |
-| :--- | :--- | :--- | :--- | :--- |
-| **End-to-End Autocomplete** | ❌ None | ✅ Yes | ⚠️ Types only, manual client | ✅ **Full client autocomplete** |
-| **Path Params Interpolation** | ❌ Manual string concat | ⚠️ Opaque methods | ❌ Manual string concat | ✅ **Typed `params` object** |
-| **Query Params Serialization** | ⚠️ Manual `searchParams` | ⚠️ Method parameters | ❌ Manual assembly | ✅ **Typed `query` object** |
-| **Native `Response` Access** | ✅ Yes | ❌ Stripped / hidden | ✅ Yes | ✅ **Full `KyResponse` access** |
-| **Bundle Footprint** | ✅ Minimal | ❌ Heavy generated classes | ✅ Zero runtime | ✅ **~1 KB lightweight wrapper** |
-| **Ky Ecosystem (Hooks/Retry)** | ✅ Full | ❌ Not supported | ⚠️ Manual wiring | ✅ **First-class Ky integration** |
+| Feature                        | Raw `fetch` / `ky`       | Heavy SDK Generators       | `openapi-typescript` alone   | **Kygger**                        |
+| :----------------------------- | :----------------------- | :------------------------- | :--------------------------- | :-------------------------------- |
+| **End-to-End Autocomplete**    | ❌ None                  | ✅ Yes                     | ⚠️ Types only, manual client | ✅ **Full client autocomplete**   |
+| **Path Params Interpolation**  | ❌ Manual string concat  | ⚠️ Opaque methods          | ❌ Manual string concat      | ✅ **Typed `params` object**      |
+| **Query Params Serialization** | ⚠️ Manual `searchParams` | ⚠️ Method parameters       | ❌ Manual assembly           | ✅ **Typed `query` object**       |
+| **Native `Response` Access**   | ✅ Yes                   | ❌ Stripped / hidden       | ✅ Yes                       | ✅ **Full `KyResponse` access**   |
+| **Bundle Footprint**           | ✅ Minimal               | ❌ Heavy generated classes | ✅ Zero runtime              | ✅ **~1 KB lightweight wrapper**  |
+| **Ky Ecosystem (Hooks/Retry)** | ✅ Full                  | ❌ Not supported           | ⚠️ Manual wiring             | ✅ **First-class Ky integration** |
 
 ---
 

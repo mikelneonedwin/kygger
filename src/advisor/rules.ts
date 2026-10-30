@@ -97,12 +97,11 @@ export function runDiagnostics(spec: SpecLike): Diagnostic[] {
       (schema.anyOf?.length ?? 0) > 0 ||
       (schema.allOf?.length ?? 0) > 0;
 
-    if (
-      schema.type === "object" &&
-      !hasProps &&
-      !hasAddProps &&
-      !hasCompositions
-    ) {
+    const isObjectType =
+      schema.type === "object" ||
+      (Array.isArray(schema.type) && schema.type.includes("object"));
+
+    if (isObjectType && !hasProps && !hasAddProps && !hasCompositions) {
       diagnostics.push({
         ruleId: "empty-object-schema",
         category: "type-safety",
@@ -274,7 +273,7 @@ export function runDiagnostics(spec: SpecLike): Diagnostic[] {
         }
       }
 
-      // Check $ref inside responses and requestBody
+      // Check $ref inside responses, requestBody, and parameters
       for (const [code, resp] of Object.entries(responses)) {
         if (resp.content) {
           for (const media of Object.values(resp.content)) {
@@ -298,6 +297,58 @@ export function runDiagnostics(spec: SpecLike): Diagnostic[] {
                     });
                   }
                 }
+              }
+            }
+          }
+        }
+      }
+
+      if (op.requestBody?.content) {
+        for (const media of Object.values(op.requestBody.content)) {
+          if (media.schema) {
+            const refs = new Set<string>();
+            collectRefs(media.schema, refs);
+            for (const ref of refs) {
+              if (ref.startsWith("#/components/schemas/")) {
+                const target = ref.replace("#/components/schemas/", "");
+                if (!knownSchemaNames.has(target)) {
+                  diagnostics.push({
+                    ruleId: "broken-ref",
+                    category: "spec-integrity",
+                    severity: "error",
+                    endpoint,
+                    specPath: `paths['${route}'].${method}.requestBody`,
+                    message: `Broken reference: '${ref}' does not exist in components.schemas.`,
+                    recommendation: `Target schema '${target}' is missing from components.schemas. Generated TypeScript will fail compilation with TS2304.`,
+                    docUrl:
+                      "https://spec.openapis.org/oas/v3.0.3#reference-object",
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
+      for (const param of mergedParamsMap.values()) {
+        if (param.schema) {
+          const refs = new Set<string>();
+          collectRefs(param.schema, refs);
+          for (const ref of refs) {
+            if (ref.startsWith("#/components/schemas/")) {
+              const target = ref.replace("#/components/schemas/", "");
+              if (!knownSchemaNames.has(target)) {
+                diagnostics.push({
+                  ruleId: "broken-ref",
+                  category: "spec-integrity",
+                  severity: "error",
+                  endpoint,
+                  specPath: `paths['${route}'].${method}.parameters['${param.name}']`,
+                  message: `Broken reference: '${ref}' does not exist in components.schemas.`,
+                  recommendation: `Target schema '${target}' is missing from components.schemas. Generated TypeScript will fail compilation with TS2304.`,
+                  docUrl:
+                    "https://spec.openapis.org/oas/v3.0.3#reference-object",
+                });
               }
             }
           }
