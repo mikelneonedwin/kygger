@@ -112,4 +112,38 @@ describe("Runtime Client and Handler Integration", () => {
 
     expect(capturedBody).toBe(formData);
   });
+
+  it("returns undefined on 204 No Content without crashing on .json()", async () => {
+    const mockClient = {
+      delete: () => {
+        const promise = Promise.resolve({
+          status: 204,
+          json: () => Promise.reject(new Error("Unexpected end of JSON input")),
+        });
+        (promise as any).json = () =>
+          Promise.reject(new Error("Unexpected end of JSON input"));
+        return promise;
+      },
+    } as any;
+
+    const api = createApiClient(mockClient);
+
+    // Test res.json()
+    const res = await (api as any).delete({
+      path: "/items/{id}",
+      params: { id: "item-1" },
+    });
+    expect(res.status).toBe(204);
+    const data = await res.json();
+    expect(data).toBeUndefined();
+
+    // Test direct .json()
+    const directData = await (api as any)
+      .delete({
+        path: "/items/{id}",
+        params: { id: "item-1" },
+      })
+      .json();
+    expect(directData).toBeUndefined();
+  });
 });

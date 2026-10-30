@@ -469,10 +469,6 @@ export async function generate(
     parser: "typescript",
   });
 
-  ensureDirExists(typesPath);
-  writeFileSync(typesPath, formatted);
-  console.info(`Successfully generated ${typesPath}`);
-
   const isDiagnosticsEnabled = Boolean(
     options.diagnostics ||
     options.advisor ||
@@ -524,6 +520,10 @@ export async function generate(
       }
     }
   }
+
+  ensureDirExists(typesPath);
+  writeFileSync(typesPath, formatted);
+  console.info(`Successfully generated ${typesPath}`);
 }
 
 export async function main(): Promise<void> {
