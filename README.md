@@ -14,7 +14,7 @@
 
 Modern web apps constantly suffer from **API type drift**:
 
-1. **Manual Types Drift Silently**: You write `interface UserDto { ... }` on the frontend. When the backend renames a field or changes an ID from `string` to `number`, your TypeScript compiles without warnings—until production crashes with `undefined is not a function`.
+1. **Manual Types Drift Silently**: You write `interface UserDto { ... }` on the frontend. When the backend renames a field or changes an ID from `string` to `number`, your TypeScript compiles without warnings, until production crashes with `undefined is not a function`.
 2. **String URLs & Manual Formatting**: Constructing URLs like `/api/v1/users/${id}?filter=${encodeURIComponent(query)}` is error-prone. One typo in a query parameter or path segment breaks your request.
 3. **Manual Generics Are Unenforced**: Calling `ky.get('/users').json<MyDto>()` doesn't verify that `/users` actually returns `MyDto`. The generic is just a blind type assertion (`as MyDto`).
 4. **Heavy SDK Generators Are Bloated**: Traditional OpenAPI generators produce hundreds of messy class files, opinionated wrappers, and bloated bundles that obscure the underlying HTTP response.
@@ -135,18 +135,61 @@ const createResponse = await api.post({
 });
 const newPost = await createResponse.json();
 
-// 3. POST with Multipart / FormData upload
+// 3. Multi-Status Discrimination:
+const courseRes = await api.post({
+  path: "/courses",
+  json: { title: "TypeScript Mastery" },
+});
+
+if (courseRes.status === 201) {
+  // TypeScript narrows .json() to CreatedCourseDto
+  const created = await courseRes.json();
+} else if (courseRes.status === 200) {
+  // TypeScript narrows .json() to ExistingCourseDto
+  const existing = await courseRes.json();
+}
+
+// 4. POST with Multipart / FormData upload
 const uploadResponse = await api.post({
   path: "/users/{id}/avatar",
   params: { id: "usr_2" },
   body: new FormData(),
 });
 
-// 4. Full native Response access remains intact!
+// 5. Full native Response access remains intact!
 console.log(userResponse.status); // 200
 console.log(userResponse.headers.get("x-request-id"));
 const avatarBlob = await uploadResponse.blob();
 const textBody = await userResponse.text();
+```
+
+---
+
+## OpenAPI Diagnostics & Best Practice Advisor
+
+Kygger includes an opt-in advisor that audits your OpenAPI specification during generation to prevent silent runtime errors and guarantee end-to-end type safety:
+
+- **Empty 200 Responses**: Flags endpoints returning 200 without a response schema, suggesting `204 No Content` or `201 Created`.
+- **204 With Body**: Catches RFC 9110 violations where 204 responses define a body schema (which causes runtime JSON parse failures).
+- **GET/DELETE With Request Body**: Warns when read operations carry a body that will be stripped by browsers, CDNs, or proxies.
+- **Path Parameter Mismatches**: Detects template variables (`{id}`) missing from `parameters` or marked `required: false`.
+- **Empty Object DTOs**: Detects backend models generated without fields (e.g. missing `@ApiProperty()` in NestJS).
+- **Broken References**: Catches dangling `$ref` pointers before they cause TypeScript compiler errors.
+- **Destructive GETs**: Identifies destructive actions exposed over GET requests.
+
+### Opt-In Diagnostics, AI Prompts & CI Reports
+
+Diagnostics is opt-in, keeping standard generation silent and focused. Enable diagnostics using `--diagnostics` (or `-d` / `--advisor` / `-a`), or by specifying a report format or strict mode:
+
+```bash
+# Run generation with OpenAPI diagnostics enabled in console
+npx kygger ./swagger.json --diagnostics
+
+# Export AI-ready remediation prompt
+npx kygger ./swagger.json --report prompt --report-file audit-prompt.md
+
+# CI strict mode (fails with exit code 1 if errors or warnings exist)
+npx kygger ./swagger.json --strict
 ```
 
 ---
@@ -190,9 +233,15 @@ npx kygger <openapi-spec-url-or-file> [options]
 
 ### CLI Flags
 
-| Flag      | Short | Description                                     | Default          |
-| :-------- | :---- | :---------------------------------------------- | :--------------- |
-| `--types` | `-t`  | Output path for generated TypeScript types file | `./api.types.ts` |
+| Flag            | Short | Description                                                            | Default          |
+| :-------------- | :---- | :--------------------------------------------------------------------- | :--------------- |
+| `--types`       | `-t`  | Output path for generated TypeScript types file                        | `./api.types.ts` |
+| `--diagnostics` | `-d`  | Enable OpenAPI diagnostics and advisor checks (opt-in)                 | `false`          |
+| `--advisor`     | `-a`  | Alias for `--diagnostics`                                              | `false`          |
+| `--quiet`       | `-q`  | Suppress diagnostic messages and warnings (or set `KYGGER_QUIET=true`) | `false`          |
+| `--strict`      |       | Exit with non-zero exit code if warnings or errors are found           | `false`          |
+| `--report`      |       | Diagnostic output format (`console`, `markdown`, `json`, `prompt`)     | `console`        |
+| `--report-file` |       | Path to export the diagnostic report to                                | `undefined`      |
 
 ---
 
