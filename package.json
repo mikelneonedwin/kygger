@@ -3,6 +3,25 @@
   "version": "1.1.0",
   "description": "API types generator and client factory for OpenAPI",
   "license": "MIT",
+  "author": "Winner Edwin",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mikelneonedwin/kygger.git"
+  },
+  "homepage": "https://github.com/mikelneonedwin/kygger#readme",
+  "bugs": {
+    "url": "https://github.com/mikelneonedwin/kygger/issues"
+  },
+  "keywords": [
+    "openapi",
+    "swagger",
+    "ky",
+    "typescript",
+    "types",
+    "type-safe",
+    "client",
+    "generator"
+  ],
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
