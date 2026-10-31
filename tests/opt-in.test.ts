@@ -176,6 +176,23 @@ describe("CLI Opt-in and Execution Verification", () => {
     expect(stdout).toContain("[WARN]");
   });
 
+  it("package CLI runs diagnostics and generation only once", () => {
+    const typesOut = resolve(outputDir, "package-cli-diagnostics.ts");
+    const proc = Bun.spawnSync([
+      process.execPath,
+      resolve(__dirname, "../bin/kygger.js"),
+      flawedSpecPath,
+      "-t",
+      typesOut,
+      "--diagnostics",
+    ]);
+
+    expect(proc.exitCode).toBe(0);
+    const stdout = proc.stdout.toString();
+    expect(stdout.match(/Kygger Spec Diagnostics/g)).toHaveLength(1);
+    expect(stdout.match(/Successfully generated/g)).toHaveLength(1);
+  });
+
   it("CLI with -a alias prints advisor diagnostics", async () => {
     const typesOut = resolve(outputDir, "cli-advisor-alias.ts");
     const proc = Bun.spawnSync([

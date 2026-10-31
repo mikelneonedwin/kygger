@@ -1,6 +1,6 @@
 {
   "name": "kygger",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "API types generator and client factory for OpenAPI",
   "license": "MIT",
   "author": "Winner Edwin",
@@ -41,9 +41,10 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "prepare": "lefthook install",
-    "patch": "npm whoami && npm version patch && npm publish && git push --follow-tags",
-    "minor": "npm whoami && npm version minor && npm publish && git push --follow-tags",
-    "major": "npm whoami && npm version major && npm publish && git push --follow-tags"
+    "check-npm-auth": "npm whoami || (npm login && npm whoami)",
+    "patch": "npm run check-npm-auth && npm version patch && npm publish && git push --follow-tags",
+    "minor": "npm run check-npm-auth && npm version minor && npm publish && git push --follow-tags",
+    "major": "npm run check-npm-auth && npm version major && npm publish && git push --follow-tags"
   },
   "dependencies": {
     "prettier": "^3.8.1",

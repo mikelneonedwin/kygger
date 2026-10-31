@@ -152,6 +152,16 @@ describe("OpenAPI Diagnostics Advisor Rules", () => {
     const rule6 = diagnostics.filter((d) => d.ruleId === "empty-200-response");
     expect(rule6).toHaveLength(1);
     expect(rule6[0].severity).toBe("warning");
+    expect(rule6[0].message).toContain(
+      "does not fully describe its response representation",
+    );
+    expect(rule6[0].recommendation).toContain("text/event-stream");
+    expect(rule6[0].recommendation).toContain(
+      "3xx response and Location header",
+    );
+    expect(rule6[0].recommendation).toContain(
+      "HTTP 204 only when the response has no body",
+    );
   });
 
   it("detects broken $ref pointers across schemas, responses, requestBody and params (Rule 7)", () => {
