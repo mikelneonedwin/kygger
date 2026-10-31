@@ -182,7 +182,7 @@ const textBody = await userResponse.text();
 
 Kygger includes an opt-in advisor that audits your OpenAPI specification during generation to prevent silent runtime errors and guarantee end-to-end type safety:
 
-- **Empty 200 Responses**: Flags endpoints returning 200 without a response schema, suggesting `204 No Content` or `201 Created`.
+- **Undocumented 200 Responses**: Flags endpoints whose 200 response does not describe its representation. Document the actual media type and schema where applicable, or a redirect's 3xx status and `Location` header. Use `204 No Content` only when there is no body, and `201 Created` only when the operation creates a resource.
 - **204 With Body**: Catches RFC 9110 violations where 204 responses define a body schema (which causes runtime JSON parse failures).
 - **GET/DELETE With Request Body**: Warns when read operations carry a body that will be stripped by browsers, CDNs, or proxies.
 - **Path Parameter Mismatches**: Detects template variables (`{id}`) missing from `parameters` or marked `required: false`.

@@ -249,7 +249,7 @@ export function runDiagnostics(spec: SpecLike): Diagnostic[] {
         });
       }
 
-      // Check 6: Empty 200 response with no content/schema
+      // Check 6: HTTP 200 response without a documented representation
       const resp200 = responses["200"];
       if (resp200) {
         const contentKeys = Object.keys(resp200.content ?? {});
@@ -266,9 +266,9 @@ export function runDiagnostics(spec: SpecLike): Diagnostic[] {
             severity: "warning",
             endpoint,
             specPath: `paths['${route}'].${method}.responses['200']`,
-            message: `Returns HTTP 200 OK without a response schema or content definition.`,
-            recommendation: `If this endpoint returns no payload, use HTTP 204 (No Content) [RFC 9110 §15.3.5]. If it creates a resource, use HTTP 201 (Created) [RFC 9110 §15.3.2] with a schema or Location header. If returning JSON, declare content['application/json'].schema.`,
-            docUrl: "https://www.rfc-editor.org/rfc/rfc9110#section-15.3.5",
+            message: `HTTP 200 response does not fully describe its response representation.`,
+            recommendation: `Document the endpoint's actual behavior. If it returns a representation, declare its media type and schema where applicable, including non-JSON types such as application/pdf, text/csv, or text/event-stream. If it redirects, document the 3xx response and Location header. Use HTTP 204 only when the response has no body, and HTTP 201 only when the operation creates a resource.`,
+            docUrl: "https://www.rfc-editor.org/rfc/rfc9110#section-15.3",
           });
         }
       }
