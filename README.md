@@ -23,8 +23,10 @@ Modern web apps constantly suffer from **API type drift**:
 
 `kygger` bridges the gap between your OpenAPI contract and your HTTP client:
 
-- **Single Source of Truth**: Generates a single, compact `api.types.ts` tree directly from your OpenAPI specification.
-- **100% Autocompleted & Verified**: Route paths, path parameters (`params`), query parameters (`query`), and request bodies (`json` or `FormData`) are verified at compile time.
+- **Single Source of Truth**: Generates a single, compact `api.types.ts` tree directly from your OpenAPI specification (JSON or YAML).
+- **100% Autocompleted & Verified**: Route paths, path parameters (`params`), query parameters (`query`), and request bodies (`json` or `FormData`) are verified at compile time with parameter scoping.
+- **Status-Based Type Narrowing**: Discriminated response types allow narrowing `.json()` by checking `res.status` on multi-status endpoints.
+- **Safe 204 & Non-JSON Support**: Maps 204 No Content to `void` without runtime JSON parse errors, and maps binary downloads (`Blob`), plain text (`string`), and server-sent events (`ReadableStream`).
 - **Preserves Native Ky & Fetch Powers**: You are never locked into an opaque SDK. Kygger returns a real `KyResponse`, giving you direct access to `.blob()`, `.text()`, `.formData()`, `.headers`, `.status`, `.clone()`, and Ky's hook and retry architecture.
 - **Zero Runtime Bloat**: The generator only outputs TypeScript types. The client runtime is an ultra-lightweight (~1 KB) wrapper around Ky.
 
@@ -156,7 +158,18 @@ const uploadResponse = await api.post({
   body: new FormData(),
 });
 
-// 5. Full native Response access remains intact!
+// 5. DELETE with 204 No Content (safely resolves void)
+const deleteResponse = await api.delete({
+  path: "/users/{id}",
+  params: { id: "usr_2" },
+});
+const deleted = await deleteResponse.json(); // void
+
+// 6. Binary file downloads (PDF, images, octet-stream)
+const reportResponse = await api.get({ path: "/reports/monthly" });
+const pdfBlob = await reportResponse.blob(); // Blob
+
+// 7. Full native Response access remains intact!
 console.log(userResponse.status); // 200
 console.log(userResponse.headers.get("x-request-id"));
 const avatarBlob = await uploadResponse.blob();
@@ -260,4 +273,4 @@ npx kygger <openapi-spec-url-or-file> [options]
 
 ## License
 
-MIT © [Winner Edwin](https://github.com/mikelneonedwin)
+[MIT](LICENSE) © [Winner Edwin](https://github.com/mikelneonedwin)
