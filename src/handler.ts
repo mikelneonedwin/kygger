@@ -52,6 +52,48 @@ export function handler<
       requestOptions.body = options.body;
     }
 
-    return client[method as HTTPMethods](url, requestOptions);
+    const responsePromise = client[method as HTTPMethods](url, requestOptions);
+
+    if (!responsePromise || typeof responsePromise.then !== "function") {
+      return responsePromise;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const hooked = responsePromise.then((response: any) => {
+      if (response && (response.status === 204 || response.status === 205)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        response.json = async (): Promise<any> => undefined;
+      }
+      return response;
+    });
+
+    return new Proxy(hooked, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      get(target: any, prop: string | symbol) {
+        if (prop === "json") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return async (): Promise<any> => {
+            const response = await target;
+            if (
+              response &&
+              (response.status === 204 || response.status === 205)
+            ) {
+              return undefined;
+            }
+            if (typeof responsePromise.json === "function") {
+              return responsePromise.json();
+            }
+            return response.json();
+          };
+        }
+        if (prop in target) {
+          const val = target[prop];
+          return typeof val === "function" ? val.bind(target) : val;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const val = (responsePromise as any)[prop];
+        return typeof val === "function" ? val.bind(responsePromise) : val;
+      },
+    });
   };
 }

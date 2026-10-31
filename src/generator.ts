@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import * as prettier from "prettier";
 import yaml from "yaml";
+import { formatDiagnostics } from "./advisor/reporter";
+import { runDiagnostics } from "./advisor/rules";
+import type { ReportFormat } from "./advisor/types";
 
 export function ensureDirExists(filePath: string): void {
   const dir = dirname(filePath);
@@ -226,7 +229,7 @@ function generatePathParamsType(
     const type =
       schemaType === "integer" || schemaType === "number" ? "number" : "string";
 
-    return `${paramName}: ${type};`;
+    return `"${paramName}": ${type};`;
   });
 
   return `{\n${props.join("\n")}\n}`;
@@ -253,8 +256,81 @@ function generateQueryParamsType(
   return `{\n${props.join("\n")}\n}`;
 }
 
+function mergeParameters(
+  pathItemParams: ParameterObject[] = [],
+  opParams: ParameterObject[] = [],
+): ParameterObject[] {
+  const map = new Map<string, ParameterObject>();
+  for (const p of pathItemParams) {
+    if (p?.name && p?.in) map.set(`${p.in}:${p.name}`, p);
+  }
+  for (const p of opParams) {
+    if (p?.name && p?.in) map.set(`${p.in}:${p.name}`, p);
+  }
+  return Array.from(map.values());
+}
+
+function parseResponseType(
+  responseObj: ResponseObject,
+  statusCode: string,
+  rootSpec: OpenApiSpec,
+): string {
+  if (statusCode === "204") {
+    return "void";
+  }
+
+  const content = responseObj.content;
+  if (!content) {
+    return "void";
+  }
+
+  if (content["application/json"]?.schema) {
+    return parseSchema(content["application/json"].schema, rootSpec);
+  }
+
+  const binaryPrefixes = [
+    "application/octet-stream",
+    "application/pdf",
+    "application/zip",
+    "image/",
+    "audio/",
+    "video/",
+  ];
+  const hasBinary = Object.keys(content).some((mime) =>
+    binaryPrefixes.some((b) => mime.startsWith(b)),
+  );
+  if (hasBinary) {
+    return "Blob";
+  }
+
+  const textPrefixes = ["text/plain", "text/csv", "text/html", "text/markdown"];
+  const hasText = Object.keys(content).some((mime) =>
+    textPrefixes.some((t) => mime.startsWith(t)),
+  );
+  if (hasText) {
+    return "string";
+  }
+
+  if (content["text/event-stream"]) {
+    return "ReadableStream";
+  }
+
+  const firstMime = Object.keys(content)[0];
+  if (firstMime && content[firstMime]?.schema) {
+    return parseSchema(content[firstMime].schema, rootSpec);
+  }
+
+  return "unknown";
+}
+
 export interface GenerateOptions {
   typesPath?: string;
+  diagnostics?: boolean;
+  advisor?: boolean;
+  quiet?: boolean;
+  strict?: boolean;
+  report?: ReportFormat;
+  reportFile?: string;
 }
 
 export async function generate(
@@ -287,7 +363,8 @@ export async function generate(
 `);
   buffer.push(`/* eslint-disable */`);
   buffer.push(`// @ts-nocheck`);
-  buffer.push(`import type { KyResponse } from "ky";\n`);
+  buffer.push(`import type { KyResponse } from "ky";`);
+  buffer.push(`import type { KyggerResponse } from "kygger";\n`);
   buffer.push(`// --- Generated Types from OpenAPI Spec --- \n`);
 
   if (spec.components?.schemas) {
@@ -320,36 +397,34 @@ export async function generate(
       buffer.push(`    "${route}": {`);
       buffer.push(`      pathname: "${route}";`);
 
-      const pathParamsType = generatePathParamsType(
-        route,
+      const mergedParameters = mergeParameters(
         pathItem.parameters as ParameterObject[],
+        op.parameters as ParameterObject[],
       );
+
+      const pathParamsType = generatePathParamsType(route, mergedParameters);
       if (pathParamsType !== "undefined") {
         buffer.push(`      params: ${pathParamsType};`);
       }
 
-      if (op.parameters) {
-        const queryType = generateQueryParamsType(op.parameters, spec);
-        if (queryType !== "undefined") {
-          buffer.push(`      query: ${queryType};`);
-        }
+      const queryType = generateQueryParamsType(mergedParameters, spec);
+      if (queryType !== "undefined") {
+        buffer.push(`      query: ${queryType};`);
       }
 
-      const successKey = Object.keys(op.responses || {}).find((k) =>
+      const successEntries = Object.entries(op.responses || {}).filter(([k]) =>
         k.startsWith("2"),
       );
-      if (successKey && op.responses) {
-        const successResponse = op.responses[successKey];
-        if (
-          successResponse?.content &&
-          successResponse.content["application/json"]?.schema
-        ) {
-          const returnType = parseSchema(
-            successResponse.content["application/json"].schema,
-            spec,
-          );
-          buffer.push(`      response: KyResponse<${returnType}>;`);
-        }
+
+      if (successEntries.length > 0) {
+        const responseVariants = successEntries.map(([code, resp]) => {
+          const returnType = parseResponseType(resp, code, spec);
+          const numericCode = parseInt(code, 10);
+          const statusType = isNaN(numericCode) ? "number" : numericCode;
+          return `KyggerResponse<${returnType}, ${statusType}>`;
+        });
+
+        buffer.push(`      response: ${responseVariants.join(" | ")};`);
       }
 
       if (op.requestBody && op.requestBody.content) {
@@ -394,6 +469,58 @@ export async function generate(
     parser: "typescript",
   });
 
+  const isDiagnosticsEnabled = Boolean(
+    options.diagnostics ||
+    options.advisor ||
+    options.strict ||
+    options.report ||
+    options.reportFile ||
+    process.env.KYGGER_DIAGNOSTICS === "true" ||
+    process.env.KYGGER_DIAGNOSTICS === "1" ||
+    process.env.KYGGER_ADVISOR === "true" ||
+    process.env.KYGGER_ADVISOR === "1",
+  );
+
+  if (isDiagnosticsEnabled) {
+    const diagnostics = runDiagnostics(
+      spec as unknown as Parameters<typeof runDiagnostics>[0],
+    );
+    const isQuiet =
+      options.quiet ??
+      (process.env.KYGGER_QUIET === "true" || process.env.KYGGER_QUIET === "1");
+
+    if (options.reportFile) {
+      const reportFormat = options.report ?? "markdown";
+      const reportContent = formatDiagnostics(diagnostics, reportFormat);
+      const resolvedReportPath = resolve(cwd, options.reportFile);
+      ensureDirExists(resolvedReportPath);
+      writeFileSync(resolvedReportPath, reportContent);
+      console.info(`Exported diagnostic report to ${resolvedReportPath}`);
+    }
+
+    if (!isQuiet) {
+      const consoleOutput = formatDiagnostics(
+        diagnostics,
+        options.report ?? "console",
+      );
+      if (consoleOutput) {
+        console.log(consoleOutput);
+      }
+    }
+
+    if (options.strict) {
+      const hasErrorsOrWarnings = diagnostics.some(
+        (d) => d.severity === "error" || d.severity === "warning",
+      );
+      if (hasErrorsOrWarnings) {
+        console.error(
+          `Exiting with code 1 due to --strict flag (${diagnostics.length} diagnostic issue(s) detected).`,
+        );
+        process.exit(1);
+      }
+    }
+  }
+
   ensureDirExists(typesPath);
   writeFileSync(typesPath, formatted);
   console.info(`Successfully generated ${typesPath}`);
@@ -408,6 +535,27 @@ export async function main(): Promise<void> {
         type: "string",
         short: "t",
       },
+      diagnostics: {
+        type: "boolean",
+        short: "d",
+      },
+      advisor: {
+        type: "boolean",
+        short: "a",
+      },
+      quiet: {
+        type: "boolean",
+        short: "q",
+      },
+      strict: {
+        type: "boolean",
+      },
+      report: {
+        type: "string",
+      },
+      "report-file": {
+        type: "string",
+      },
     },
     allowPositionals: true,
   });
@@ -415,12 +563,20 @@ export async function main(): Promise<void> {
   const src = positionals[0];
 
   if (!src) {
-    console.error("Usage: kygger <source-url-or-file> [--types|-t path.ts]");
+    console.error(
+      "Usage: kygger <source-url-or-file> [--types|-t path.ts] [--diagnostics|-d] [--advisor|-a] [--quiet|-q] [--strict] [--report console|markdown|json|prompt] [--report-file path]",
+    );
     process.exit(1);
   }
 
   await generate(src, {
     typesPath: values.types,
+    diagnostics: values.diagnostics,
+    advisor: values.advisor,
+    quiet: values.quiet,
+    strict: values.strict,
+    report: values.report as ReportFormat | undefined,
+    reportFile: values["report-file"],
   });
 }
 
